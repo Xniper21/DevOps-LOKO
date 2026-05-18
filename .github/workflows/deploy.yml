@@ -3,7 +3,7 @@ name: CI/CD Completo Multi-Maquina - DevOps LOKO
 on:
   push:
     branches:
-      - deploy # Punto de activación mandatorio según rúbrica
+      - deploy
 
 jobs:
   ci_cd_process:
@@ -73,7 +73,7 @@ jobs:
     - name: Esperar inicializacion de instancias
       run: sleep 30
 
-    # Despliegue en la máquina de Backend (Los 2 Microservicios Java)
+    # Despliegue en la máquina de Backend (Microservicios Java)
     - name: Desplegar Backend en EC2 via SSH
       uses: appleboy/ssh-action@master
       with:
@@ -81,14 +81,14 @@ jobs:
         username: ubuntu
         key: ${{ secrets.EC2_SSH_KEY }}
         script: |
-          echo "=== Esperando instalacion completa del entorno ==="
-          while ! command -v docker &> /dev/null; do
+          echo "=== Esperando instalacion completa de Docker y Compose ==="
+          while ! command -v docker &> /dev/null || ! docker compose version &> /dev/null; do
+            echo "El entorno de Docker aun se esta configurando en AWS, esperando 5 segundos..."
             sleep 5
           done
           
-          if ! command -v docker-compose &> /dev/null; then
-            sudo apt-get update && sudo apt-get install -y docker-compose
-          fi
+          # Una pausa de estabilidad extra para asegurar que el socket de red este mapeado
+          sleep 5
           
           rm -rf proyecto-semestral
           git clone -b deploy https://github.com/${{ github.repository }}.git proyecto-semestral
@@ -96,10 +96,10 @@ jobs:
           
           export DOCKER_HUB_USER=${{ secrets.DOCKERHUB_USERNAME }}
           
-          # Sintaxis estándar corregida: -f va inmediatamente antes de la acción
-          sudo docker-compose -f docker-compose-backend.yml down
-          sudo docker-compose -f docker-compose-backend.yml pull
-          sudo docker-compose -f docker-compose-backend.yml up -d
+          # Usando la sintaxis moderna con espacio 'docker compose' sin necesidad de apt-get
+          sudo docker compose -f docker-compose-backend.yml down
+          sudo docker compose -f docker-compose-backend.yml pull
+          sudo docker compose -f docker-compose-backend.yml up -d
           
           sleep 2
           sudo docker image prune -f
@@ -112,14 +112,14 @@ jobs:
         username: ubuntu
         key: ${{ secrets.EC2_SSH_KEY }}
         script: |
-          echo "=== Esperando instalacion completa del entorno ==="
-          while ! command -v docker &> /dev/null; do
+          echo "=== Esperando instalacion completa de Docker y Compose ==="
+          while ! command -v docker &> /dev/null || ! docker compose version &> /dev/null; do
+            echo "El entorno de Docker aun se esta configurando en AWS, esperando 5 segundos..."
             sleep 5
           done
           
-          if ! command -v docker-compose &> /dev/null; then
-            sudo apt-get update && sudo apt-get install -y docker-compose
-          fi
+          # Una pausa de estabilidad extra para asegurar que el socket de red este mapeado
+          sleep 5
           
           rm -rf proyecto-semestral
           git clone -b deploy https://github.com/${{ github.repository }}.git proyecto-semestral
@@ -127,10 +127,10 @@ jobs:
           
           export DOCKER_HUB_USER=${{ secrets.DOCKERHUB_USERNAME }}
           
-          # Sintaxis estándar corregida: -f va inmediatamente antes de la acción
-          sudo docker-compose -f docker-compose-frontend.yml down
-          sudo docker-compose -f docker-compose-frontend.yml pull
-          sudo docker-compose -f docker-compose-frontend.yml up -d
+          # Usando la sintaxis moderna con espacio 'docker compose' sin necesidad de apt-get
+          sudo docker compose -f docker-compose-frontend.yml down
+          sudo docker compose -f docker-compose-frontend.yml pull
+          sudo docker compose -f docker-compose-frontend.yml up -d
           
           sleep 2
           sudo docker image prune -f
