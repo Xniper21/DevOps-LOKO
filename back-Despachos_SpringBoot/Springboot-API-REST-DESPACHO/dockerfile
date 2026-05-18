@@ -2,24 +2,18 @@
 FROM maven:3.8.5-openjdk-17 AS build
 WORKDIR /app
 
-# Copiar el archivo de configuración de dependencias pom.xml
 COPY pom.xml .
-
-# Copiar el código fuente del microservicio
 COPY src ./src
 
-# Compilar el código y generar el archivo .jar omitiendo los tests para acelerar el pipeline
-run mvn clean package -DskipTests
+# Corregido a MAYÚSCULAS para evitar advertencias
+RUN mvn clean package -DskipTests
 
-# Etapa 2: Entorno de ejecución ligero
-FROM openjdk:17-jdk-slim
+# Etapa 2: Entorno de ejecución ligero (CORREGIDO CON TEMURIN)
+FROM eclipse-temurin:17-jre-slim
 WORKDIR /app
 
-# Copiar el .jar generado en la etapa anterior (asegúrate de que el nombre coincida con tu pom.xml)
 COPY --from=build /app/target/*.jar app.jar
 
-# Exponer el puerto por defecto de Spring Boot
 EXPOSE 8080
 
-# Comando para ejecutar la aplicación de despachos
 ENTRYPOINT ["java", "-jar", "app.jar"]
