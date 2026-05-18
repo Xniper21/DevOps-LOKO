@@ -24,14 +24,25 @@ jobs:
         username: ${{ secrets.DOCKERHUB_USERNAME }}
         password: ${{ secrets.DOCKERHUB_TOKEN }}
 
-    # 2. Construir las imágenes Docker personalizadas especificando la ruta exacta de cada Dockerfile
+    # 2. Construir las imágenes Docker personalizadas ingresando a cada contexto directamente
     - name: Construir imagenes Docker (CI)
       run: |
-        docker build -f ./back-Despachos_SpringBoot/Springboot-API-REST-DESPACHO/Dockerfile -t ${{ secrets.DOCKERHUB_USERNAME }}/back-despachos:latest ./back-Despachos_SpringBoot/Springboot-API-REST-DESPACHO
-        docker build -f ./back-Ventas_SpringBoot/Springboot-API-REST/Dockerfile -t ${{ secrets.DOCKERHUB_USERNAME }}/back-ventas:latest ./back-Ventas_SpringBoot/Springboot-API-REST
-        docker build -f ./front_despacho/Dockerfile -t ${{ secrets.DOCKERHUB_USERNAME }}/front-despacho:latest ./front_despacho
+        echo "=== Construyendo Microservicio Despachos ==="
+        cd ./back-Despachos_SpringBoot/Springboot-API-REST-DESPACHO
+        docker build -t ${{ secrets.DOCKERHUB_USERNAME }}/back-despachos:latest .
+        cd ../../
+        
+        echo "=== Construyendo Microservicio Ventas ==="
+        cd ./back-Ventas_SpringBoot/Springboot-API-REST
+        docker build -t ${{ secrets.DOCKERHUB_USERNAME }}/back-ventas:latest .
+        cd ../../
+        
+        echo "=== Construyendo Frontend ==="
+        cd ./front_despacho
+        docker build -t ${{ secrets.DOCKERHUB_USERNAME }}/front-despacho:latest .
+        cd ../
 
-    # 3. Publicar y versionar las imágenes en el registro público cumpliendo con el punto 2 de tu rúbrica
+    # 3. Publicar y versionar las imágenes en el registro público de Docker Hub
     - name: Publicar imagenes en Docker Hub (CI)
       run: |
         docker push ${{ secrets.DOCKERHUB_USERNAME }}/back-despachos:latest
