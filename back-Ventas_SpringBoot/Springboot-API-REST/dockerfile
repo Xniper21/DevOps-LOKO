@@ -7,12 +7,14 @@ COPY src ./src
 
 RUN mvn clean package -DskipTests
 
-# Etapa 2: Entorno de ejecución ligero (CORREGIDO CON AMAZON CORRETTO)
+# Etapa 2: Entorno de ejecución ligero
 FROM amazoncorretto:17-alpine
 WORKDIR /app
 
+# Crear un usuario sin privilegios para no correr la app como Root
+RUN addgroup -S spring && adduser -S spring -G spring
+USER spring:spring
+
 COPY --from=build /app/target/*.jar app.jar
-
 EXPOSE 8080
-
 ENTRYPOINT ["java", "-jar", "app.jar"]

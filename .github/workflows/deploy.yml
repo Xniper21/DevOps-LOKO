@@ -3,7 +3,7 @@ name: CI/CD Completo - Proyecto Semestral Microservicios
 on:
   push:
     branches:
-      - main
+      - deploy
 
 jobs:
   ci_cd_process:
