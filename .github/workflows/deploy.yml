@@ -1,9 +1,9 @@
-name: CI/CD Completo - Proyecto Semestral Microservicios
+name: CI/CD Completo Multi-Maquina - DevOps LOKO
 
 on:
   push:
     branches:
-      - deploy
+      - deploy # Activación mandatoria según rúbrica
 
 jobs:
   ci_cd_process:
@@ -14,50 +14,25 @@ jobs:
       uses: actions/checkout@v3
 
     # ==========================================
-    # FASE DE CI (INTEGRACIÓN CONTINUA)
+    # FASE DE CI (CONSTRUCCIÓN Y PUBLICACIÓN)
     # ==========================================
-
-    # 1. Iniciar sesión de forma segura en Docker Hub
     - name: Login en Docker Hub
       uses: docker/login-action@v2
       with:
         username: ${{ secrets.DOCKERHUB_USERNAME }}
         password: ${{ secrets.DOCKERHUB_TOKEN }}
 
-# 2. Diagnóstico y construcción paso a paso
     - name: Construir imagenes Docker (CI)
       run: |
-        echo "=== UBICACIÓN ACTUAL ==="
-        pwd
-        
-        echo "=== LISTADO DE CARPETAS EN LA RAÍZ ==="
-        ls -la
-        
-        echo "=== BUSCANDO TODOS LOS DOCKERFILES EN EL PROYECTO ==="
-        find . -name "*Dockerfile*" -o -name "*dockerfile*"
-        
-        echo "=== Iniciando construcción de Despachos ==="
-        # Buscaremos la carpeta de forma dinámica sin importar diferencias menores en el nombre
-        DESPACHOS_DIR=$(find . -type d -name "Springboot-API-REST-DESPACHO" | head -n 1)
-        echo "Carpeta encontrada para Despachos: $DESPACHOS_DIR"
-        cd "$DESPACHOS_DIR"
+        cd ./back-Despachos_SpringBoot/Springboot-API-REST-DESPACHO
         docker build -t ${{ secrets.DOCKERHUB_USERNAME }}/back-despachos:latest .
         cd -
-        
-        echo "=== Iniciando construcción de Ventas ==="
-        VENTAS_DIR=$(find . -type d -name "Springboot-API-REST" | head -n 1)
-        echo "Carpeta encontrada para Ventas: $VENTAS_DIR"
-        cd "$VENTAS_DIR"
+        cd ./back-Ventas_SpringBoot/Springboot-API-REST
         docker build -t ${{ secrets.DOCKERHUB_USERNAME }}/back-ventas:latest .
         cd -
-        
-        echo "=== Iniciando construcción de Frontend ==="
-        FRONT_DIR=$(find . -type d -name "front_despacho" | head -n 1)
-        echo "Carpeta encontrada para Frontend: $FRONT_DIR"
-        cd "$FRONT_DIR"
+        cd ./front_despacho
         docker build -t ${{ secrets.DOCKERHUB_USERNAME }}/front-despacho:latest .
 
-    # 3. Publicar y versionar las imágenes en el registro público de Docker Hub
     - name: Publicar imagenes en Docker Hub (CI)
       run: |
         docker push ${{ secrets.DOCKERHUB_USERNAME }}/back-despachos:latest
@@ -65,10 +40,8 @@ jobs:
         docker push ${{ secrets.DOCKERHUB_USERNAME }}/front-despacho:latest
 
     # ==========================================
-    # FASE DE CD (DESPLIEGUE CONTINUO)
+    # FASE DE CD (INFRAESTRUCTURA Y DESPLIEGUE)
     # ==========================================
-
-    # 4. Inyectar credenciales dinámicas para el aprovisionamiento de infraestructura en AWS Academy
     - name: Configurar credenciales de AWS
       uses: aws-actions/configure-aws-credentials@v2
       with:
@@ -77,14 +50,13 @@ jobs:
         aws-session-token: ${{ secrets.AWS_SESSION_TOKEN }}
         aws-region: us-east-1
 
-    # 5. Preparar el entorno para ejecutar Terraform
     - name: Configurar Terraform
       uses: hashicorp/setup-terraform@v2
       with:
         terraform_wrapper: false
 
-# 6. Validar, inicializar y aplicar la infraestructura (EC2 + Security Groups)
     - name: Terraform Init y Apply (CD)
+      id: tf_apply
       run: |
         terraform init
         terraform apply -auto-approve \
@@ -92,34 +64,55 @@ jobs:
           -var="aws_secret_access_key=${{ secrets.AWS_SECRET_ACCESS_KEY }}" \
           -var="aws_session_token=${{ secrets.AWS_SESSION_TOKEN }}"
         
-        # CORREGIDO: Extraer los dos nuevos outputs correspondientes de las dos maquinas
-        echo "FRONTEND_IP=$(terraform output -raw frontend_public_ip)" >> $GITHUB_ENV
-        echo "BACKEND_IP=$(terraform output -raw backend_public_ip)" >> $GITHUB_ENV
+        # Extracción e inyección explícita al entorno de GitHub para persistir entre pasos
+        FRONT_IP=$(terraform output -raw frontend_public_ip)
+        BACK_IP=$(terraform output -raw backend_public_ip)
+        
+        echo "FRONTEND_IP=$FRONT_IP" >> $GITHUB_ENV
+        echo "BACKEND_IP=$BACK_IP" >> $GITHUB_ENV
 
-    # 7. Conectarse a la EC2 por SSH, descargar la configuración y ejecutar las imágenes publicadas
-    - name: Desplegar contenedores en AWS EC2 via SSH (CD)
+    # Pausa obligatoria para mitigar el error "connection refused" mientras inicia SSH en AWS
+    - name: Esperar inicializacion de instancias
+      run: sleep 30
+
+    # Despliegue en la máquina de Backend (Microservicios Java)
+    - name: Desplegar Backend en EC2 via SSH
       uses: appleboy/ssh-action@master
       with:
-        host: ${{ env.EC2_IP }}
+        host: ${{ env.BACKEND_IP }}
         username: ubuntu
         key: ${{ secrets.EC2_SSH_KEY }}
         script: |
-          # Actualizar o clonar la estructura de archivos en el servidor
           if [ ! -d "proyecto-semestral" ]; then
             git clone https://github.com/${{ github.repository }}.git proyecto-semestral
             cd proyecto-semestral
           else
             cd proyecto-semestral
-            git pull origin main
+            git pull origin deploy
           fi
-          
-          # Pasar el nombre de usuario de Docker Hub como variable de entorno al docker-compose
           export DOCKER_HUB_USER=${{ secrets.DOCKERHUB_USERNAME }}
-          
-          # Bajar servicios activos, descargar las nuevas imágenes empaquetadas desde Docker Hub y levantar
-          sudo -E docker-compose down
-          sudo -E docker-compose pull
-          sudo -E docker-compose up -d
-          
-          # Limpieza de almacenamiento para evitar saturación de espacio en la EC2
+          sudo -E docker-compose -f docker-compose-backend.yml down
+          sudo -E docker-compose -f docker-compose-backend.yml pull
+          sudo -E docker-compose -f docker-compose-backend.yml up -d
+          sudo docker image prune -f
+
+    # Despliegue en la máquina de Frontend (React / Nginx)
+    - name: Desplegar Frontend en EC2 via SSH
+      uses: appleboy/ssh-action@master
+      with:
+        host: ${{ env.FRONTEND_IP }}
+        username: ubuntu
+        key: ${{ secrets.EC2_SSH_KEY }}
+        script: |
+          if [ ! -d "proyecto-semestral" ]; then
+            git clone https://github.com/${{ github.repository }}.git proyecto-semestral
+            cd proyecto-semestral
+          else
+            cd proyecto-semestral
+            git pull origin deploy
+          fi
+          export DOCKER_HUB_USER=${{ secrets.DOCKERHUB_USERNAME }}
+          sudo -E docker-compose -f docker-compose-frontend.yml down
+          sudo -E docker-compose -f docker-compose-frontend.yml pull
+          sudo -E docker-compose -f docker-compose-frontend.yml up -d
           sudo docker image prune -f
