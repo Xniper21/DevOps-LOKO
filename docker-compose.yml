@@ -1,9 +1,7 @@
 version: '3.8'
 
 services:
-  # Microservicio de Despachos (Spring Boot)
   back-despachos:
-    # En producción y CD, descarga la imagen directamente desde tu Docker Hub
     image: ${DOCKER_HUB_USER}/back-despachos:latest
     container_name: back-despachos-container
     ports:
@@ -12,8 +10,9 @@ services:
       - SPRING_PROFILES_ACTIVE=prod
     networks:
       - proyecto-network
+    volumes:
+      - datos_despachos:/app/data
 
-  # Microservicio de Ventas (Spring Boot)
   back-ventas:
     image: ${DOCKER_HUB_USER}/back-ventas:latest
     container_name: back-ventas-container
@@ -23,8 +22,9 @@ services:
       - SPRING_PROFILES_ACTIVE=prod
     networks:
       - proyecto-network
+    volumes:
+      - datos_ventas:/app/data
 
-  # Frontend (React / Vite)
   front-despacho:
     image: ${DOCKER_HUB_USER}/front-despacho:latest
     container_name: front-despacho-container
@@ -39,3 +39,9 @@ services:
 networks:
   proyecto-network:
     driver: bridge
+
+volumes:
+  datos_despachos:
+    driver: local
+  datos_ventas:
+    driver: local

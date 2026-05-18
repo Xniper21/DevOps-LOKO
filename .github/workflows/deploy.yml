@@ -3,7 +3,7 @@ name: CI/CD Completo Multi-Maquina - DevOps LOKO
 on:
   push:
     branches:
-      - deploy
+      - deploy # Punto de activación mandatorio según rúbrica
 
 jobs:
   ci_cd_process:
@@ -73,7 +73,7 @@ jobs:
     - name: Esperar inicializacion de instancias
       run: sleep 30
 
-    # Despliegue en la máquina de Backend (Microservicios Java)
+    # Despliegue en la máquina de Backend (Los 2 Microservicios Java)
     - name: Desplegar Backend en EC2 via SSH
       uses: appleboy/ssh-action@master
       with:
@@ -81,25 +81,27 @@ jobs:
         username: ubuntu
         key: ${{ secrets.EC2_SSH_KEY }}
         script: |
-          echo "=== Esperando de forma segura a que Docker termine de instalarse ==="
+          echo "=== Esperando instalacion completa del entorno ==="
           while ! command -v docker &> /dev/null; do
-            echo "Docker aun no esta listo, esperando 5 segundos..."
             sleep 5
           done
           
-          # Forzar limpieza total de directorios antiguos para evitar conflictos de cache o Git
+          if ! command -v docker-compose &> /dev/null; then
+            sudo apt-get update && sudo apt-get install -y docker-compose
+          fi
+          
           rm -rf proyecto-semestral
           git clone -b deploy https://github.com/${{ github.repository }}.git proyecto-semestral
           cd proyecto-semestral
           
           export DOCKER_HUB_USER=${{ secrets.DOCKERHUB_USERNAME }}
           
-          # Comandos estructurados con la bandera -f en la posicion correcta
-          sudo docker compose -f docker-compose-backend.yml down
-          sudo docker compose -f docker-compose-backend.yml pull
-          sudo docker compose -f docker-compose-backend.yml up -d
+          # Sintaxis estándar corregida: -f va inmediatamente antes de la acción
+          sudo docker-compose -f docker-compose-backend.yml down
+          sudo docker-compose -f docker-compose-backend.yml pull
+          sudo docker-compose -f docker-compose-backend.yml up -d
           
-          sleep 3
+          sleep 2
           sudo docker image prune -f
 
     # Despliegue en la máquina de Frontend (React / Nginx)
@@ -110,23 +112,25 @@ jobs:
         username: ubuntu
         key: ${{ secrets.EC2_SSH_KEY }}
         script: |
-          echo "=== Esperando de forma segura a que Docker termine de instalarse ==="
+          echo "=== Esperando instalacion completa del entorno ==="
           while ! command -v docker &> /dev/null; do
-            echo "Docker aun no esta listo, esperando 5 segundos..."
             sleep 5
           done
           
-          # Forzar limpieza total de directorios antiguos para evitar conflictos de cache o Git
+          if ! command -v docker-compose &> /dev/null; then
+            sudo apt-get update && sudo apt-get install -y docker-compose
+          fi
+          
           rm -rf proyecto-semestral
           git clone -b deploy https://github.com/${{ github.repository }}.git proyecto-semestral
           cd proyecto-semestral
           
           export DOCKER_HUB_USER=${{ secrets.DOCKERHUB_USERNAME }}
           
-          # Comandos estructurados con la bandera -f en la posicion correcta
-          sudo docker compose -f docker-compose-frontend.yml down
-          sudo docker compose -f docker-compose-frontend.yml pull
-          sudo docker compose -f docker-compose-frontend.yml up -d
+          # Sintaxis estándar corregida: -f va inmediatamente antes de la acción
+          sudo docker-compose -f docker-compose-frontend.yml down
+          sudo docker-compose -f docker-compose-frontend.yml pull
+          sudo docker-compose -f docker-compose-frontend.yml up -d
           
-          sleep 3
+          sleep 2
           sudo docker image prune -f
