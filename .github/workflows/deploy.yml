@@ -24,12 +24,12 @@ jobs:
         username: ${{ secrets.DOCKERHUB_USERNAME }}
         password: ${{ secrets.DOCKERHUB_TOKEN }}
 
-    # 2. Construir las imágenes Docker personalizadas para cada componente utilizando sus Dockerfiles
+    # 2. Construir las imágenes Docker personalizadas especificando la ruta exacta de cada Dockerfile
     - name: Construir imagenes Docker (CI)
       run: |
-        docker build -t ${{ secrets.DOCKERHUB_USERNAME }}/back-despachos:latest ./back-Despachos_SpringBoot/Springboot-API-REST-DESPACHO
-        docker build -t ${{ secrets.DOCKERHUB_USERNAME }}/back-ventas:latest ./back-Ventas_SpringBoot/Springboot-API-REST
-        docker build -t ${{ secrets.DOCKERHUB_USERNAME }}/front-despacho:latest ./front_despacho
+        docker build -f ./back-Despachos_SpringBoot/Springboot-API-REST-DESPACHO/Dockerfile -t ${{ secrets.DOCKERHUB_USERNAME }}/back-despachos:latest ./back-Despachos_SpringBoot/Springboot-API-REST-DESPACHO
+        docker build -f ./back-Ventas_SpringBoot/Springboot-API-REST/Dockerfile -t ${{ secrets.DOCKERHUB_USERNAME }}/back-ventas:latest ./back-Ventas_SpringBoot/Springboot-API-REST
+        docker build -f ./front_despacho/Dockerfile -t ${{ secrets.DOCKERHUB_USERNAME }}/front-despacho:latest ./front_despacho
 
     # 3. Publicar y versionar las imágenes en el registro público cumpliendo con el punto 2 de tu rúbrica
     - name: Publicar imagenes en Docker Hub (CI)
