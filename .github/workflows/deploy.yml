@@ -87,15 +87,14 @@ jobs:
             sleep 5
           done
           
-          if [ ! -d "proyecto-semestral" ]; then
-            git clone https://github.com/${{ github.repository }}.git proyecto-semestral
-            cd proyecto-semestral
-          else
-            cd proyecto-semestral
-            git pull origin deploy
-          fi
+          # Forzar limpieza total de directorios antiguos para evitar conflictos de cache o Git
+          rm -rf proyecto-semestral
+          git clone -b deploy https://github.com/${{ github.repository }}.git proyecto-semestral
+          cd proyecto-semestral
+          
           export DOCKER_HUB_USER=${{ secrets.DOCKERHUB_USERNAME }}
           
+          # Comandos estructurados con la bandera -f en la posicion correcta
           sudo docker compose -f docker-compose-backend.yml down
           sudo docker compose -f docker-compose-backend.yml pull
           sudo docker compose -f docker-compose-backend.yml up -d
@@ -117,15 +116,14 @@ jobs:
             sleep 5
           done
           
-          if [ ! -d "proyecto-semestral" ]; then
-            git clone https://github.com/${{ github.repository }}.git proyecto-semestral
-            cd proyecto-semestral
-          else
-            cd proyecto-semestral
-            git pull origin deploy
-          fi
+          # Forzar limpieza total de directorios antiguos para evitar conflictos de cache o Git
+          rm -rf proyecto-semestral
+          git clone -b deploy https://github.com/${{ github.repository }}.git proyecto-semestral
+          cd proyecto-semestral
+          
           export DOCKER_HUB_USER=${{ secrets.DOCKERHUB_USERNAME }}
           
+          # Comandos estructurados con la bandera -f en la posicion correcta
           sudo docker compose -f docker-compose-frontend.yml down
           sudo docker compose -f docker-compose-frontend.yml pull
           sudo docker compose -f docker-compose-frontend.yml up -d
