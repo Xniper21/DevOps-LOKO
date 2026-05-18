@@ -3,7 +3,7 @@ name: CI/CD Completo Multi-Maquina - DevOps LOKO
 on:
   push:
     branches:
-      - [cite_start]deploy # Activación mandatoria según rúbrica [cite: 44, 113]
+      - deploy
 
 jobs:
   ci_cd_process:
