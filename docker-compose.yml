@@ -1,0 +1,47 @@
+version: '3.8'
+
+services:
+  # Microservicio de Despachos (Spring Boot)
+  back-despachos:
+    build:
+      context: ./back-Despachos_SpringBoot/Springboot-API-REST-DESPACHO
+      dockerfile: Dockerfile
+    container_name: back-despachos-container
+    ports:
+      - "8081:8080" # Expone el puerto 8081 hacia la EC2 mapeado al 8080 interno del contenedor
+    environment:
+      - SPRING_PROFILES_ACTIVE=prod
+    networks:
+      - proyecto-network
+
+  # Microservicio de Ventas (Spring Boot)
+  back-ventas:
+    build:
+      context: ./back-Ventas_SpringBoot/Springboot-API-REST
+      dockerfile: Dockerfile
+    container_name: back-ventas-container
+    ports:
+      - "8082:8080" # Expone el puerto 8082 hacia la EC2 mapeado al 8080 interno del contenedor
+    environment:
+      - SPRING_PROFILES_ACTIVE=prod
+    networks:
+      - proyecto-network
+
+  # Frontend (React / Vite)
+  front-despacho:
+    build:
+      context: ./front_despacho
+      dockerfile: Dockerfile
+    container_name: front-despacho-container
+    ports:
+      - "80:80" # Expone el puerto 80 estándar para que puedas acceder directo con la IP pública de la EC2
+    depends_on:
+      - back-despachos
+      - back-ventas
+    networks:
+      - proyecto-network
+
+# Red virtual interna para comunicación directa entre los contenedores
+networks:
+  proyecto-network:
+    driver: bridge

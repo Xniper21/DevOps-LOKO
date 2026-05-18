@@ -1,0 +1,61 @@
+name: CI/CD AWS Academy con Terraform y Docker
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  infrastructure_and_deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout del codigo
+      uses: actions/checkout@v3
+
+    # 1. Configurar las credenciales dinamicas de AWS Academy en el runner de GitHub
+    - name: Configurar credenciales de AWS
+      uses: aws-actions/configure-aws-credentials@v2
+      with:
+        aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+        aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+        aws-session-token: ${{ secrets.AWS_SESSION_TOKEN }}
+        aws-region: us-east-1
+
+    # 2. Configurar Terraform en el entorno de GitHub Actions
+    - name: Configurar Terraform
+      uses: hashicorp/setup-terraform@v2
+      with:
+        terraform_wrapper: false
+
+    # 3. Inicializar y aplicar Terraform usando las variables de entorno para tus AWS_SECRETS
+    - name: Terraform Init y Apply
+      id: tf_step
+      run: |
+        terraform init
+        terraform apply -auto-approve \
+          -var="aws_access_key_id=${{ secrets.AWS_ACCESS_KEY_ID }}" \
+          -var="aws_secret_access_key=${{ secrets.AWS_SECRET_ACCESS_KEY }}" \
+          -var="aws_session_token=${{ secrets.AWS_SESSION_TOKEN }}"
+        
+        # Guardar la IP publica generada por Terraform para usarla en el siguiente paso
+        echo "EC2_IP=$(terraform output -raw instance_public_ip)" >> $GITHUB_ENV
+
+    # 4. Desplegar los microservicios mediante SSH en la EC2 recien validada o creada
+    - name: Desplegar Docker Compose via SSH
+      uses: appleboy/ssh-action@master
+      with:
+        host: ${{ env.EC2_IP }}
+        username: ubuntu
+        key: ${{ secrets.EC2_SSH_KEY }} # Tu llave privada .pem de vockey
+        script: |
+          if [ ! -d "proyecto-semestral" ]; then
+            git clone https://github.com/${{ github.repository }}.git proyecto-semestral
+            cd proyecto-semestral
+          else
+            cd proyecto-semestral
+            git pull origin main
+          fi
+          sudo docker-compose down
+          sudo docker-compose up --build -d
+          sudo docker image prune -f
