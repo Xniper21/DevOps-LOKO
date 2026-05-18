@@ -1,4 +1,4 @@
-name: CI/CD AWS Academy con Terraform y Docker
+name: CI/CD Completo - Proyecto Semestral Microservicios
 
 on:
   push:
@@ -6,14 +6,43 @@ on:
       - main
 
 jobs:
-  infrastructure_and_deploy:
+  ci_cd_process:
     runs-on: ubuntu-latest
 
     steps:
     - name: Checkout del codigo
       uses: actions/checkout@v3
 
-    # 1. Configurar las credenciales dinamicas de AWS Academy en el runner de GitHub
+    # ==========================================
+    # FASE DE CI (INTEGRACIÓN CONTINUA)
+    # ==========================================
+
+    # 1. Iniciar sesión de forma segura en Docker Hub
+    - name: Login en Docker Hub
+      uses: docker/login-action@v2
+      with:
+        username: ${{ secrets.DOCKERHUB_USERNAME }}
+        password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+    # 2. Construir las imágenes Docker personalizadas para cada componente utilizando sus Dockerfiles
+    - name: Construir imagenes Docker (CI)
+      run: |
+        docker build -t ${{ secrets.DOCKERHUB_USERNAME }}/back-despachos:latest ./back-Despachos_SpringBoot/Springboot-API-REST-DESPACHO
+        docker build -t ${{ secrets.DOCKERHUB_USERNAME }}/back-ventas:latest ./back-Ventas_SpringBoot/Springboot-API-REST
+        docker build -t ${{ secrets.DOCKERHUB_USERNAME }}/front-despacho:latest ./front_despacho
+
+    # 3. Publicar y versionar las imágenes en el registro público cumpliendo con el punto 2 de tu rúbrica
+    - name: Publicar imagenes en Docker Hub (CI)
+      run: |
+        docker push ${{ secrets.DOCKERHUB_USERNAME }}/back-despachos:latest
+        docker push ${{ secrets.DOCKERHUB_USERNAME }}/back-ventas:latest
+        docker push ${{ secrets.DOCKERHUB_USERNAME }}/front-despacho:latest
+
+    # ==========================================
+    # FASE DE CD (DESPLIEGUE CONTINUO)
+    # ==========================================
+
+    # 4. Inyectar credenciales dinámicas para el aprovisionamiento de infraestructura en AWS Academy
     - name: Configurar credenciales de AWS
       uses: aws-actions/configure-aws-credentials@v2
       with:
@@ -22,15 +51,14 @@ jobs:
         aws-session-token: ${{ secrets.AWS_SESSION_TOKEN }}
         aws-region: us-east-1
 
-    # 2. Configurar Terraform en el entorno de GitHub Actions
+    # 5. Preparar el entorno para ejecutar Terraform
     - name: Configurar Terraform
       uses: hashicorp/setup-terraform@v2
       with:
         terraform_wrapper: false
 
-    # 3. Inicializar y aplicar Terraform usando las variables de entorno para tus AWS_SECRETS
-    - name: Terraform Init y Apply
-      id: tf_step
+    # 6. Validar, inicializar y aplicar la infraestructura (EC2 + Security Groups)
+    - name: Terraform Init y Apply (CD)
       run: |
         terraform init
         terraform apply -auto-approve \
@@ -38,17 +66,18 @@ jobs:
           -var="aws_secret_access_key=${{ secrets.AWS_SECRET_ACCESS_KEY }}" \
           -var="aws_session_token=${{ secrets.AWS_SESSION_TOKEN }}"
         
-        # Guardar la IP publica generada por Terraform para usarla en el siguiente paso
+        # Guardar la IP del servidor en el entorno del pipeline
         echo "EC2_IP=$(terraform output -raw instance_public_ip)" >> $GITHUB_ENV
 
-    # 4. Desplegar los microservicios mediante SSH en la EC2 recien validada o creada
-    - name: Desplegar Docker Compose via SSH
+    # 7. Conectarse a la EC2 por SSH, descargar la configuración y ejecutar las imágenes publicadas
+    - name: Desplegar contenedores en AWS EC2 via SSH (CD)
       uses: appleboy/ssh-action@master
       with:
         host: ${{ env.EC2_IP }}
         username: ubuntu
-        key: ${{ secrets.EC2_SSH_KEY }} # Tu llave privada .pem de vockey
+        key: ${{ secrets.EC2_SSH_KEY }}
         script: |
+          # Actualizar o clonar la estructura de archivos en el servidor
           if [ ! -d "proyecto-semestral" ]; then
             git clone https://github.com/${{ github.repository }}.git proyecto-semestral
             cd proyecto-semestral
@@ -56,6 +85,14 @@ jobs:
             cd proyecto-semestral
             git pull origin main
           fi
-          sudo docker-compose down
-          sudo docker-compose up --build -d
+          
+          # Pasar el nombre de usuario de Docker Hub como variable de entorno al docker-compose
+          export DOCKER_HUB_USER=${{ secrets.DOCKERHUB_USERNAME }}
+          
+          # Bajar servicios activos, descargar las nuevas imágenes empaquetadas desde Docker Hub y levantar
+          sudo -E docker-compose down
+          sudo -E docker-compose pull
+          sudo -E docker-compose up -d
+          
+          # Limpieza de almacenamiento para evitar saturación de espacio en la EC2
           sudo docker image prune -f
