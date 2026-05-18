@@ -43,7 +43,7 @@ data "aws_vpc" "default" {
 
 # 4. Grupo de Seguridad para habilitar los puertos del Frontend y Microservicios
 resource "aws_security_group" "proyecto_sg" {
-  name        = "sg_proyecto_semestral"
+  name        = "sg_proyecto_semestral_v2" # <--- Agrégale un _v2 aquí
   description = "Permitir el trafico para los microservicios de ventas, despachos y frontend"
   vpc_id      = data.aws_vpc.default.id
 
