@@ -87,19 +87,16 @@ jobs:
             sleep 5
           done
           
-          # Una pausa de estabilidad extra para asegurar que el socket de red este mapeado
           sleep 5
           
           rm -rf proyecto-semestral
           git clone -b deploy https://github.com/${{ github.repository }}.git proyecto-semestral
           cd proyecto-semestral
           
-          export DOCKER_HUB_USER=${{ secrets.DOCKERHUB_USERNAME }}
-          
-          # Usando la sintaxis moderna con espacio 'docker compose' sin necesidad de apt-get
-          sudo docker compose -f docker-compose-backend.yml down
-          sudo docker compose -f docker-compose-backend.yml pull
-          sudo docker compose -f docker-compose-backend.yml up -d
+          # CORRECCIÓN DE PRIVILEGIOS: Inyección directa mediante sudo -E para preservar el entorno en la sesión
+          sudo -E DOCKER_HUB_USER=${{ secrets.DOCKERHUB_USERNAME }} docker compose -f docker-compose-backend.yml down
+          sudo -E DOCKER_HUB_USER=${{ secrets.DOCKERHUB_USERNAME }} docker compose -f docker-compose-backend.yml pull
+          sudo -E DOCKER_HUB_USER=${{ secrets.DOCKERHUB_USERNAME }} docker compose -f docker-compose-backend.yml up -d
           
           sleep 2
           sudo docker image prune -f
@@ -118,19 +115,16 @@ jobs:
             sleep 5
           done
           
-          # Una pausa de estabilidad extra para asegurar que el socket de red este mapeado
           sleep 5
           
           rm -rf proyecto-semestral
           git clone -b deploy https://github.com/${{ github.repository }}.git proyecto-semestral
           cd proyecto-semestral
           
-          export DOCKER_HUB_USER=${{ secrets.DOCKERHUB_USERNAME }}
-          
-          # Usando la sintaxis moderna con espacio 'docker compose' sin necesidad de apt-get
-          sudo docker compose -f docker-compose-frontend.yml down
-          sudo docker compose -f docker-compose-frontend.yml pull
-          sudo docker compose -f docker-compose-frontend.yml up -d
+          # CORRECCIÓN DE PRIVILEGIOS: Inyección directa mediante sudo -E para preservar el entorno en la sesión
+          sudo -E DOCKER_HUB_USER=${{ secrets.DOCKERHUB_USERNAME }} docker compose -f docker-compose-frontend.yml down
+          sudo -E DOCKER_HUB_USER=${{ secrets.DOCKERHUB_USERNAME }} docker compose -f docker-compose-frontend.yml pull
+          sudo -E DOCKER_HUB_USER=${{ secrets.DOCKERHUB_USERNAME }} docker compose -f docker-compose-frontend.yml up -d
           
           sleep 2
           sudo docker image prune -f
