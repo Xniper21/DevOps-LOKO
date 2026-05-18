@@ -24,23 +24,38 @@ jobs:
         username: ${{ secrets.DOCKERHUB_USERNAME }}
         password: ${{ secrets.DOCKERHUB_TOKEN }}
 
-    # 2. Construir las imágenes Docker personalizadas ingresando a cada contexto directamente
+# 2. Diagnóstico y construcción paso a paso
     - name: Construir imagenes Docker (CI)
       run: |
-        echo "=== Construyendo Microservicio Despachos ==="
-        cd ./back-Despachos_SpringBoot/Springboot-API-REST-DESPACHO
+        echo "=== UBICACIÓN ACTUAL ==="
+        pwd
+        
+        echo "=== LISTADO DE CARPETAS EN LA RAÍZ ==="
+        ls -la
+        
+        echo "=== BUSCANDO TODOS LOS DOCKERFILES EN EL PROYECTO ==="
+        find . -name "*Dockerfile*" -o -name "*dockerfile*"
+        
+        echo "=== Iniciando construcción de Despachos ==="
+        # Buscaremos la carpeta de forma dinámica sin importar diferencias menores en el nombre
+        DESPACHOS_DIR=$(find . -type d -name "Springboot-API-REST-DESPACHO" | head -n 1)
+        echo "Carpeta encontrada para Despachos: $DESPACHOS_DIR"
+        cd "$DESPACHOS_DIR"
         docker build -t ${{ secrets.DOCKERHUB_USERNAME }}/back-despachos:latest .
-        cd ../../
+        cd -
         
-        echo "=== Construyendo Microservicio Ventas ==="
-        cd ./back-Ventas_SpringBoot/Springboot-API-REST
+        echo "=== Iniciando construcción de Ventas ==="
+        VENTAS_DIR=$(find . -type d -name "Springboot-API-REST" | head -n 1)
+        echo "Carpeta encontrada para Ventas: $VENTAS_DIR"
+        cd "$VENTAS_DIR"
         docker build -t ${{ secrets.DOCKERHUB_USERNAME }}/back-ventas:latest .
-        cd ../../
+        cd -
         
-        echo "=== Construyendo Frontend ==="
-        cd ./front_despacho
+        echo "=== Iniciando construcción de Frontend ==="
+        FRONT_DIR=$(find . -type d -name "front_despacho" | head -n 1)
+        echo "Carpeta encontrada para Frontend: $FRONT_DIR"
+        cd "$FRONT_DIR"
         docker build -t ${{ secrets.DOCKERHUB_USERNAME }}/front-despacho:latest .
-        cd ../
 
     # 3. Publicar y versionar las imágenes en el registro público de Docker Hub
     - name: Publicar imagenes en Docker Hub (CI)
