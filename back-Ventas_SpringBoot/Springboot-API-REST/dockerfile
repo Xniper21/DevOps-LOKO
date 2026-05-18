@@ -7,8 +7,8 @@ COPY src ./src
 
 RUN mvn clean package -DskipTests
 
-# Etapa 2: Entorno de ejecución ligero (CORREGIDO CON TEMURIN)
-FROM eclipse-temurin:17-jre-slim
+# Etapa 2: Entorno de ejecución ligero (CORREGIDO CON AMAZON CORRETTO)
+FROM amazoncorretto:17-alpine
 WORKDIR /app
 
 COPY --from=build /app/target/*.jar app.jar
