@@ -11,16 +11,16 @@ jobs:
 
     steps:
     - name: Checkout del codigo
-      [cite_start]uses: actions/checkout@v3 [cite: 14]
+      uses: actions/checkout@v3
 
     # ==========================================
-    # FASE DE CI (CONSTRUCCIÓN Y PUBLICACIÓN) [cite: 36, 102]
+    # FASE DE CI (CONSTRUCCIÓN Y PUBLICACIÓN)
     # ==========================================
     - name: Login en Docker Hub
-      [cite_start]uses: docker/login-action@v2 [cite: 41, 111]
+      uses: docker/login-action@v2
       with:
-        [cite_start]username: ${{ secrets.DOCKERHUB_USERNAME }} [cite: 43, 114]
-        [cite_start]password: ${{ secrets.DOCKERHUB_TOKEN }} [cite: 43, 114]
+        username: ${{ secrets.DOCKERHUB_USERNAME }}
+        password: ${{ secrets.DOCKERHUB_TOKEN }}
 
     - name: Construir imagenes Docker (CI)
       run: |
@@ -35,19 +35,19 @@ jobs:
 
     - name: Publicar imagenes en Docker Hub (CI)
       run: |
-        docker push ${{ secrets.DOCKERHUB_USERNAME }}/back-despachos:latest [cite: 41, 111]
-        docker push ${{ secrets.DOCKERHUB_USERNAME }}/back-ventas:latest [cite: 41, 111]
-        docker push ${{ secrets.DOCKERHUB_USERNAME }}/front-despacho:latest [cite: 41, 111]
+        docker push ${{ secrets.DOCKERHUB_USERNAME }}/back-despachos:latest
+        docker push ${{ secrets.DOCKERHUB_USERNAME }}/back-ventas:latest
+        docker push ${{ secrets.DOCKERHUB_USERNAME }}/front-despacho:latest
 
     # ==========================================
-    # FASE DE CD (INFRAESTRUCTURA Y DESPLIEGUE) [cite: 36, 102]
+    # FASE DE CD (INFRAESTRUCTURA Y DESPLIEGUE)
     # ==========================================
     - name: Configurar credenciales de AWS
-      [cite_start]uses: aws-actions/configure-aws-credentials@v2 [cite: 43, 114]
+      uses: aws-actions/configure-aws-credentials@v2
       with:
-        [cite_start]aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }} [cite: 43, 114]
-        [cite_start]aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }} [cite: 43, 114]
-        [cite_start]aws-session-token: ${{ secrets.AWS_SESSION_TOKEN }} [cite: 43, 114]
+        aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+        aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+        aws-session-token: ${{ secrets.AWS_SESSION_TOKEN }}
         aws-region: us-east-1
 
     - name: Configurar Terraform
@@ -73,13 +73,13 @@ jobs:
     - name: Esperar inicializacion de instancias
       run: sleep 30
 
-    # Despliegue en la máquina de Backend (Microservicios Java) [cite: 58]
+    # Despliegue en la máquina de Backend (Microservicios Java)
     - name: Desplegar Backend en EC2 via SSH
-      [cite_start]uses: appleboy/ssh-action@master [cite: 42, 112]
+      uses: appleboy/ssh-action@master
       with:
-        [cite_start]host: ${{ env.BACKEND_IP }} [cite: 42, 112]
+        host: ${{ env.BACKEND_IP }}
         username: ubuntu
-        [cite_start]key: ${{ secrets.EC2_SSH_KEY }} [cite: 43, 114]
+        key: ${{ secrets.EC2_SSH_KEY }}
         script: |
           echo "=== Esperando de forma segura a que Docker termine de instalarse ==="
           while ! command -v docker &> /dev/null; do
@@ -96,19 +96,18 @@ jobs:
           fi
           export DOCKER_HUB_USER=${{ secrets.DOCKERHUB_USERNAME }}
           
-          # Corregido a la sintaxis moderna de Docker Compose con espacio
-          [cite_start]sudo docker compose -f docker-compose-backend.yml down [cite: 33, 139]
+          sudo docker compose -f docker-compose-backend.yml down
           sudo docker compose -f docker-compose-backend.yml pull
-          [cite_start]sudo docker compose -f docker-compose-backend.yml up -d [cite: 33, 139]
+          sudo docker compose -f docker-compose-backend.yml up -d
           sudo docker image prune -f
 
-    # Despliegue en la máquina de Frontend (React / Nginx) [cite: 54]
+    # Despliegue en la máquina de Frontend (React / Nginx)
     - name: Desplegar Frontend en EC2 via SSH
-      [cite_start]uses: appleboy/ssh-action@master [cite: 42, 112]
+      uses: appleboy/ssh-action@master
       with:
-        [cite_start]host: ${{ env.FRONTEND_IP }} [cite: 42, 112]
+        host: ${{ env.FRONTEND_IP }}
         username: ubuntu
-        [cite_start]key: ${{ secrets.EC2_SSH_KEY }} [cite: 43, 114]
+        key: ${{ secrets.EC2_SSH_KEY }}
         script: |
           echo "=== Esperando de forma segura a que Docker termine de instalarse ==="
           while ! command -v docker &> /dev/null; do
@@ -125,8 +124,7 @@ jobs:
           fi
           export DOCKER_HUB_USER=${{ secrets.DOCKERHUB_USERNAME }}
           
-          # Corregido a la sintaxis moderna de Docker Compose con espacio
-          [cite_start]sudo docker compose -f docker-compose-frontend.yml down [cite: 139]
+          sudo docker compose -f docker-compose-frontend.yml down
           sudo docker compose -f docker-compose-frontend.yml pull
-          [cite_start]sudo docker compose -f docker-compose-frontend.yml up -d [cite: 139]
+          sudo docker compose -f docker-compose-frontend.yml up -d
           sudo docker image prune -f
