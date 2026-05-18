@@ -83,14 +83,18 @@ jobs:
       with:
         terraform_wrapper: false
 
-# 6. Ejecutar DESTROY temporal para limpiar el laboratorio de AWS Academy
-    - name: Terraform Destroy Temporal
+# 6. Validar, inicializar y aplicar la infraestructura (EC2 + Security Groups)
+    - name: Terraform Init y Apply (CD)
       run: |
         terraform init
-        terraform destroy -auto-approve \
+        terraform apply -auto-approve \
           -var="aws_access_key_id=${{ secrets.AWS_ACCESS_KEY_ID }}" \
           -var="aws_secret_access_key=${{ secrets.AWS_SECRET_ACCESS_KEY }}" \
           -var="aws_session_token=${{ secrets.AWS_SESSION_TOKEN }}"
+        
+        # CORREGIDO: Extraer los dos nuevos outputs correspondientes de las dos maquinas
+        echo "FRONTEND_IP=$(terraform output -raw frontend_public_ip)" >> $GITHUB_ENV
+        echo "BACKEND_IP=$(terraform output -raw backend_public_ip)" >> $GITHUB_ENV
 
     # 7. Conectarse a la EC2 por SSH, descargar la configuración y ejecutar las imágenes publicadas
     - name: Desplegar contenedores en AWS EC2 via SSH (CD)
