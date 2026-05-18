@@ -96,9 +96,13 @@ jobs:
           fi
           export DOCKER_HUB_USER=${{ secrets.DOCKERHUB_USERNAME }}
           
+          # CORREGIDO: El flag -f se coloca inmediatamente después de la palabra 'compose'
           sudo docker compose -f docker-compose-backend.yml down
           sudo docker compose -f docker-compose-backend.yml pull
           sudo docker compose -f docker-compose-backend.yml up -d
+          
+          # Pausa de estabilidad antes de la poda de imágenes huérfanas
+          sleep 3
           sudo docker image prune -f
 
     # Despliegue en la máquina de Frontend (React / Nginx)
@@ -124,7 +128,11 @@ jobs:
           fi
           export DOCKER_HUB_USER=${{ secrets.DOCKERHUB_USERNAME }}
           
+          # CORREGIDO: El flag -f se coloca inmediatamente después de la palabra 'compose'
           sudo docker compose -f docker-compose-frontend.yml down
           sudo docker compose -f docker-compose-frontend.yml pull
           sudo docker compose -f docker-compose-frontend.yml up -d
-          sudo docker image prune -f
+          
+          # Pausa de estabilidad antes de la poda de imágenes huérfanas
+          sleep 3
+          sudo docker docker image prune -f
