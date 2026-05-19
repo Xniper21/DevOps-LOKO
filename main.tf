@@ -21,37 +21,51 @@ variable "aws_access_key_id" { type = string }
 variable "aws_secret_access_key" { type = string }
 variable "aws_session_token" { type = string }
 
+# Detectar la VPC por defecto para conocer su segmento de red (CIDR)
 data "aws_vpc" "default" {
   default = true
 }
 
-# Nombre cambiado a _v3 para evitar el error de duplicados en AWS Academy
+# Modificación del Security Group adaptado para ECS e interacción con la BD
 resource "aws_security_group" "proyecto_sg" {
-  name        = "proyecto-semestral-sg"
-  description = "Permitir trafico para el despliegue de Innovatech"
+  name        = "proyecto-semestral-sg-ecs"
+  description = "Permitir trafico para hibrido Innovatech (ECS + EC2)"
 
-  # REGLA CRÍTICA: Permitir SSH para que GitHub Actions pueda entrar
+  # Regla para conectarte por SSH a la base de datos si necesitas revisar tablas
   ingress {
-    description = "SSH desde cualquier lugar para el pipeline"
+    description = "SSH desde cualquier lugar"
     from_port   = 22
     to_port     = 22
     protocol    = "tcp"
-    cidr_blocks = ["0.0.0.0/0"] # Requerido para que el runner de GitHub dinámico se conecte
+    cidr_blocks = ["0.0.0.0/0"]
   }
 
-  # Tus otras reglas de puertos (80, 8081, 8082)...
+  # Regla para el Frontend en ECS (Puerto HTTP estándar)
   ingress {
+    description = "Acceso HTTP para el Frontend en ECS"
     from_port   = 80
     to_port     = 80
     protocol    = "tcp"
     cidr_blocks = ["0.0.0.0/0"]
   }
 
+  # Regla para el Backend en ECS (Puertos de tus microservicios)
   ingress {
+    description = "Acceso a Microservicios en ECS"
     from_port   = 8081
     to_port     = 8082
     protocol    = "tcp"
     cidr_blocks = ["0.0.0.0/0"]
+  }
+
+  # REGLA CRÍTICA: Permite que ECS se conecte a la base de datos local de la EC2
+  # Usamos el CIDR de la VPC por defecto para que la comunicación sea interna y segura
+  ingress {
+    description = "Acceso a MySQL/PostgreSQL desde la red interna de la VPC"
+    from_port   = 3306 # Cambiar a 5432 si tu base de datos es PostgreSQL
+    to_port     = 3306 # Cambiar a 5432 si tu base de datos es PostgreSQL
+    protocol    = "tcp"
+    cidr_blocks = [data.aws_vpc.default.cidr_block] 
   }
 
   egress {
@@ -62,49 +76,47 @@ resource "aws_security_group" "proyecto_sg" {
   }
 }
 
-# Script base para instalar Docker en ambas maquinas
-variable "user_data_docker" {
+# Script modificado para configurar la Base de Datos en lugar de Docker
+variable "user_data_db" {
   type    = string
   default = <<-EOF
             #!/bin/bash
             apt-get update -y
-            apt-get install -y apt-transport-https ca-certificates curl software-properties-common
-            curl -fsSL https://download.docker.com/linux/ubuntu/gpg | apt-key add -
-            add-apt-repository "deb [arch=amd64] https://download.docker.com/linux/ubuntu $(lsb_release -cs) stable"
-            apt-get update -y
-            # Instala docker y el plugin moderno de compose con espacio
-            apt-get install -y docker-ce docker-compose-plugin
-            systemctl start docker
-            systemctl enable docker
-            usermod -aG docker ubuntu
+            # Ejemplo para instalar MySQL Server de forma automatizada
+            apt-get install -y mysql-server
+            systemctl start mysql
+            systemctl enable mysql
+            
+            # Configurar MySQL para que escuche peticiones de la red interna (no solo localhost)
+            sed -i 's/127.0.0.1/0.0.0.0/g' /etc/mysql/mysql.conf.d/mysqld.cnf
+            systemctl restart mysql
+            
+            # Nota: Aquí deberías ejecutar tus scripts de creación de tablas/usuarios si los tienes
             EOF
 }
 
-# Máquina 1: Frontend (React)
-resource "aws_instance" "frontend_server" {
+# La única máquina física que queda: Servidor de Base de Datos
+resource "aws_instance" "db_server" {
   ami                    = "ami-0c7217cdde317cfec"
-  instance_type          = "t2.micro" # Al correr solo Nginx/React, 1GB de RAM es suficiente
+  instance_type          = "t2.micro" # Para una BD de pruebas, micro es más que suficiente
   key_name               = "vockey"
   vpc_security_group_ids = [aws_security_group.proyecto_sg.id]
-  user_data              = var.user_data_docker
-  tags                   = { Name = "Servidor-Frontend" }
+  user_data              = var.user_data_db
+  tags                   = { Name = "Servidor-Base-Datos-Innovatech" }
 }
 
-# Máquina 2: Backend (Microservicios Ventas y Despachos)
-resource "aws_instance" "backend_server" {
-  ami                    = "ami-0c7217cdde317cfec"
-  instance_type          = "t2.medium" # Se mantiene medium por el alto consumo de los 2 entornos Java
-  key_name               = "vockey"
-  vpc_security_group_ids = [aws_security_group.proyecto_sg.id]
-  user_data              = var.user_data_docker
-  tags                   = { Name = "Servidor-Backend-Microservicios" }
+# OUTPUTS CLAVE: De aquí extraerás los datos para tu task-definition.json
+output "db_public_ip" {
+  description = "IP publica para conectarte tú mediante Workbench o DBeaver"
+  value       = aws_instance.db_server.public_ip
 }
 
-# Outputs individuales para el pipeline de CI/CD
-output "frontend_public_ip" {
-  value = aws_instance.frontend_server.public_ip
+output "db_private_ip" {
+  description = "ESTA ES LA IP QUE DEBES PEGAR EN EL DB_HOST DE TU TASK-DEFINITION"
+  value       = aws_instance.db_server.private_ip
 }
 
-output "backend_public_ip" {
-  value = aws_instance.backend_server.public_ip
+output "vpc_cidr_block" {
+  description = "Segmento de red interna de tu laboratorio"
+  value       = data.aws_vpc.default.cidr_block
 }

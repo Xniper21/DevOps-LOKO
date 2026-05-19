@@ -1,4 +1,4 @@
-name: Deploy to AWS ECR and ECS
+name: Deploy Frontend and Backend to AWS ECR/ECS
 
 on:
   push:
@@ -6,43 +6,16 @@ on:
       - deploy-ecs
 
 jobs:
-  ci_cd_process:
+  build-and-deploy:
     runs-on: ubuntu-latest
 
     steps:
-    - name: Checkout del codigo
+    # 1. Clonar el código en el Runner de GitHub
+    - name: Checkout code
       uses: actions/checkout@v3
 
-    # ==========================================
-    # FASE DE CI (CONSTRUCCIÓN Y PUBLICACIÓN)
-    # ==========================================
-    - name: Login en Docker Hub
-      uses: docker/login-action@v2
-      with:
-        username: ${{ secrets.DOCKERHUB_USERNAME }}
-        password: ${{ secrets.DOCKERHUB_TOKEN }}
-
-    - name: Construir imagenes Docker (CI)
-      run: |
-        cd ./back-Despachos_SpringBoot/Springboot-API-REST-DESPACHO
-        docker build -t ${{ secrets.DOCKERHUB_USERNAME }}/back-despachos:latest .
-        cd -
-        cd ./back-Ventas_SpringBoot/Springboot-API-REST
-        docker build -t ${{ secrets.DOCKERHUB_USERNAME }}/back-ventas:latest .
-        cd -
-        cd ./front_despacho
-        docker build -t ${{ secrets.DOCKERHUB_USERNAME }}/front-despacho:latest .
-
-    - name: Publicar imagenes en Docker Hub (CI)
-      run: |
-        docker push ${{ secrets.DOCKERHUB_USERNAME }}/back-despachos:latest
-        docker push ${{ secrets.DOCKERHUB_USERNAME }}/back-ventas:latest
-        docker push ${{ secrets.DOCKERHUB_USERNAME }}/front-despacho:latest
-
-    # ==========================================
-    # FASE DE CD (INFRAESTRUCTURA Y DESPLIEGUE)
-    # ==========================================
-    - name: Configurar credenciales de AWS
+    # 2. Autenticarse en AWS Academy usando tus Secrets actuales
+    - name: Configure AWS credentials
       uses: aws-actions/configure-aws-credentials@v2
       with:
         aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
@@ -50,81 +23,49 @@ jobs:
         aws-session-token: ${{ secrets.AWS_SESSION_TOKEN }}
         aws-region: us-east-1
 
-    - name: Configurar Terraform
-      uses: hashicorp/setup-terraform@v2
-      with:
-        terraform_wrapper: false
+    # 3. Login en Amazon ECR
+    - name: Login to Amazon ECR
+      id: login-ecr
+      uses: aws-actions/amazon-ecr-login@v2
 
-    - name: Terraform Init y Apply (CD)
-      id: tf_apply
+    # 4. Compilar y subir la imagen del Backend a ECR
+    - name: Build and Push Backend to ECR
+      env:
+        ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
       run: |
-        terraform init
-        terraform apply -auto-approve \
-          -var="aws_access_key_id=${{ secrets.AWS_ACCESS_KEY_ID }}" \
-          -var="aws_secret_access_key=${{ secrets.AWS_SECRET_ACCESS_KEY }}" \
-          -var="aws_session_token=${{ secrets.AWS_SESSION_TOKEN }}"
-        
-        FRONT_IP=$(terraform output -raw frontend_public_ip)
-        BACK_IP=$(terraform output -raw backend_public_ip)
-        
-        echo "FRONTEND_IP=$FRONT_IP" >> $GITHUB_ENV
-        echo "BACKEND_IP=$BACK_IP" >> $GITHUB_ENV
+        docker build -t $ECR_REGISTRY/innovatech/backend:latest ./proyecto-semestral-backend
+        docker push $ECR_REGISTRY/innovatech/backend:latest
 
-    - name: Esperar inicializacion de instancias
-      run: sleep 60
+    # 5. Compilar y subir la imagen del Frontend a ECR
+    - name: Build and Push Frontend to ECR
+      env:
+        ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+      run: |
+        docker build -t $ECR_REGISTRY/innovatech/frontend:latest ./proyecto-semestral-frontend
+        docker push $ECR_REGISTRY/innovatech/frontend:latest
 
-    # Despliegue en la máquina de Backend (Microservicios Java)
-    - name: Desplegar Backend en EC2 via SSH
-      uses: appleboy/ssh-action@master
+    # 6. Vincular las nuevas imágenes en el archivo task-definition.json
+    - name: Render new images in ECS Task Definition
+      id: render-task
+      uses: aws-actions/amazon-ecs-render-task-definition@v1
       with:
-        host: ${{ env.BACKEND_IP }}
-        username: ubuntu
-        key: ${{ secrets.EC2_SSH_KEY }}
-        script: |
-          echo "=== Esperando instalacion completa de Docker y Compose ==="
-          while ! command -v docker &> /dev/null || ! docker compose version &> /dev/null; do
-            echo "El entorno de Docker aun se esta configurando en AWS, esperando 5 segundos..."
-            sleep 5
-          done
-          
-          sleep 5
-          
-          rm -rf proyecto-semestral
-          git clone -b deploy https://github.com/${{ github.repository }}.git proyecto-semestral
-          cd proyecto-semestral
-          
-          # CORRECCIÓN DE PRIVILEGIOS: Inyección directa mediante sudo -E para preservar el entorno en la sesión
-          sudo -E DOCKER_HUB_USER=${{ secrets.DOCKERHUB_USERNAME }} docker compose -f docker-compose-backend.yml down
-          sudo -E DOCKER_HUB_USER=${{ secrets.DOCKERHUB_USERNAME }} docker compose -f docker-compose-backend.yml pull
-          sudo -E DOCKER_HUB_USER=${{ secrets.DOCKERHUB_USERNAME }} docker compose -f docker-compose-backend.yml up -d
-          
-          sleep 2
-          sudo docker image prune -f
+        task-definition: task-definition.json
+        container-name: backend-container
+        image: ${{ steps.login-ecr.outputs.registry }}/innovatech/backend:latest
 
-    # Despliegue en la máquina de Frontend (React / Nginx)
-    - name: Desplegar Frontend en EC2 via SSH
-      uses: appleboy/ssh-action@master
+    - name: Render Frontend image in ECS Task Definition
+      id: render-front
+      uses: aws-actions/amazon-ecs-render-task-definition@v1
       with:
-        host: ${{ env.FRONTEND_IP }}
-        username: ubuntu
-        key: ${{ secrets.EC2_SSH_KEY }}
-        script: |
-          echo "=== Esperando instalacion completa de Docker y Compose ==="
-          while ! command -v docker &> /dev/null || ! docker compose version &> /dev/null; do
-            echo "El entorno de Docker aun se esta configurando en AWS, esperando 5 segundos..."
-            sleep 5
-          done
-          
-          sleep 5
-          
-          rm -rf proyecto-semestral
-          git clone -b deploy https://github.com/${{ github.repository }}.git proyecto-semestral
-          cd proyecto-semestral
-          
-          # CORRECCIÓN DE PRIVILEGIOS: Inyección directa mediante sudo -E para preservar el entorno en la sesión
-          sudo -E DOCKER_HUB_USER=${{ secrets.DOCKERHUB_USERNAME }} docker compose -f docker-compose-frontend.yml down
-          sudo -E DOCKER_HUB_USER=${{ secrets.DOCKERHUB_USERNAME }} docker compose -f docker-compose-frontend.yml pull
-          sudo -E DOCKER_HUB_USER=${{ secrets.DOCKERHUB_USERNAME }} docker compose -f docker-compose-frontend.yml up -d
-          
-          sleep 2
-          sudo docker image prune -f
+        task-definition: ${{ steps.render-task.outputs.task-definition }}
+        container-name: frontend-container
+        image: ${{ steps.login-ecr.outputs.registry }}/innovatech/frontend:latest
+
+    # 7. Desplegar los nuevos contenedores en el servicio ECS
+    - name: Deploy to Amazon ECS
+      uses: aws-actions/amazon-ecs-deploy-task-definition@v1
+      with:
+        task-definition: ${{ steps.render-front.outputs.task-definition }}
+        service: innovatech-stack-service
+        cluster: innovatech-production-cluster
+        wait-for-service-stability: true

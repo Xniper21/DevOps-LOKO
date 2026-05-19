@@ -1,0 +1,64 @@
+{
+  "family": "innovatech-task-stack",
+  "networkMode": "awsvpc",
+  "requiresCompatibilities": ["FARGATE"],
+  "cpu": "512",
+  "memory": "1024",
+  "executionRoleArn": "arn:aws:iam::992382505002:role/LabRole",
+  "taskRoleArn": "arn:aws:iam::992382505002:role/LabRole",
+  "containerDefinitions": [
+    {
+      "name": "backend-container",
+      "image": "992382505002.dkr.ecr.us-east-1.amazonaws.com/innovatech/backend:latest",
+      "cpu": 256,
+      "memory": 512,
+      "portMappings": [
+        {
+          "containerPort": 8081,
+          "hostPort": 8081,
+          "protocol": "tcp"
+        }
+      ],
+      "essential": true,
+      "environment": [
+        {"name": "DB_HOST", "value": "IP_PRIVADA_DE_TU_EC2_BD"},
+        {"name": "DB_PORT", "value": "3306"},
+        {"name": "DB_USER", "value": "root"},
+        {"name": "DB_PASSWORD", "value": "tu_password_aqui"}
+      ],
+      "logConfiguration": {
+        "logDriver": "awslogs",
+        "options": {
+          "awslogs-group": "/ecs/innovatech-logs",
+          "awslogs-region": "us-east-1",
+          "awslogs-stream-prefix": "backend"
+        }
+      }
+    },
+    {
+      "name": "frontend-container",
+      "image": "992382505002.dkr.ecr.us-east-1.amazonaws.com/innovatech/frontend:latest",
+      "cpu": 256,
+      "memory": 512,
+      "portMappings": [
+        {
+          "containerPort": 80,
+          "hostPort": 80,
+          "protocol": "tcp"
+        }
+      ],
+      "essential": true,
+      "environment": [
+        {"name": "REACT_APP_API_URL", "value": "http://IP_PUBLICA_O_DNS_DEL_ALB_DEL_BACKEND:8081"}
+      ],
+      "logConfiguration": {
+        "logDriver": "awslogs",
+        "options": {
+          "awslogs-group": "/ecs/innovatech-logs",
+          "awslogs-region": "us-east-1",
+          "awslogs-stream-prefix": "frontend"
+        }
+      }
+    }
+  ]
+}
