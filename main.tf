@@ -27,17 +27,19 @@ data "aws_vpc" "default" {
 
 # Nombre cambiado a _v3 para evitar el error de duplicados en AWS Academy
 resource "aws_security_group" "proyecto_sg" {
-  name        = "sg_proyecto_semestral_v3"
-  description = "Permitir trafico separado para frontend y backend"
-  vpc_id      = data.aws_vpc.default.id
+  name        = "proyecto-semestral-sg"
+  description = "Permitir trafico para el despliegue de Innovatech"
 
+  # REGLA CRÍTICA: Permitir SSH para que GitHub Actions pueda entrar
   ingress {
+    description = "SSH desde cualquier lugar para el pipeline"
     from_port   = 22
     to_port     = 22
     protocol    = "tcp"
-    cidr_blocks = ["0.0.0.0/0"]
+    cidr_blocks = ["0.0.0.0/0"] # Requerido para que el runner de GitHub dinámico se conecte
   }
 
+  # Tus otras reglas de puertos (80, 8081, 8082)...
   ingress {
     from_port   = 80
     to_port     = 80
@@ -47,13 +49,6 @@ resource "aws_security_group" "proyecto_sg" {
 
   ingress {
     from_port   = 8081
-    to_port     = 8081
-    protocol    = "tcp"
-    cidr_blocks = ["0.0.0.0/0"]
-  }
-
-  ingress {
-    from_port   = 8082
     to_port     = 8082
     protocol    = "tcp"
     cidr_blocks = ["0.0.0.0/0"]

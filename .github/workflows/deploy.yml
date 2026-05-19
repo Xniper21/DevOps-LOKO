@@ -71,7 +71,7 @@ jobs:
         echo "BACKEND_IP=$BACK_IP" >> $GITHUB_ENV
 
     - name: Esperar inicializacion de instancias
-      run: sleep 30
+      run: sleep 60
 
     # Despliegue en la máquina de Backend (Microservicios Java)
     - name: Desplegar Backend en EC2 via SSH
