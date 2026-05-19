@@ -1,9 +1,9 @@
-name: CI/CD Completo Multi-Maquina - DevOps LOKO
+name: Deploy to AWS ECR and ECS
 
 on:
   push:
     branches:
-      - deploy
+      - deploy-ecs
 
 jobs:
   ci_cd_process:
